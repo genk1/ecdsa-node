@@ -2,26 +2,33 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const port = 3042;
+const secp = require('ethereum-cryptography/secp256k1');
+const { hexToBytes } = require('ethereum-cryptography/utils');
+
+const recoverKey = require('./scripts/recoverKey');
+const hashMessage = require('./scripts/hashMessage');
+const publicKeyToAddress = require('./scripts/publicKeyToAddress');
 
 app.use(cors());
 app.use(express.json());
 
 const balances = {
-  '04cfdb4d0d75f95955a9bce5b7f2e195f52b511eb5874a817178d02840e5dbd0798846eb201a4eea55974d7d6f9d60de766195b94b0535c0e41cdfb97ad14cda86': 100,
-  '042000863e8d2a2119c4c60a27f1dc2d9683b18b089f6bdca0a6aeb3058708b5879cbcedd7a41017d62d7dc1eeec8156aef391a444d86781b9188e9d67e1611e68': 50,
-  '04fa439fd487ed419f3daa13cc70ce39cb395ae6618607505200e5f4868f9af57f302702f379595c0dd2d4e592fd3061f6c92a9130c9033ea8cf6a53872dcc2e85': 75,
+  '2063b6092e98039653c3fe37c7f2ee97690e85a5': 100,
+  '22f302ecc5444d513533ae9629071a4ec867c678': 50,
+  '1da2e84f408c124a3a205d28218f63042dce54cd': 75,
 };
+
 /**
- * private 4c1195c14959f9e8b99d48eb80f81b5b751624d10a4b9f2930c3758fc4210080
- * public 04cfdb4d0d75f95955a9bce5b7f2e195f52b511eb5874a817178d02840e5dbd0798846eb201a4eea55974d7d6f9d60de766195b94b0535c0e41cdfb97ad14cda86
+ * private fdba474ab84665d8507d80e87400f15faa67ded64051585e849995baac5ac259
+ * address 2063b6092e98039653c3fe37c7f2ee97690e85a5
  */
 /**
- * private 640e4bb2aa3f82e82a803ae61156fbbdffc7c3a2bb1fe9059195e65c5a9914ce
- * public 042000863e8d2a2119c4c60a27f1dc2d9683b18b089f6bdca0a6aeb3058708b5879cbcedd7a41017d62d7dc1eeec8156aef391a444d86781b9188e9d67e1611e68
+ * private 34439cfce0125979974edd681a1e9ab8db83a5da22aebfe0963d061c9d119d97
+ * address 22f302ecc5444d513533ae9629071a4ec867c678
  */
 /**
- * private 5ba037affd6266956803bc0db6004562b810758882945fca8f6564a55687fa77
- * public 04fa439fd487ed419f3daa13cc70ce39cb395ae6618607505200e5f4868f9af57f302702f379595c0dd2d4e592fd3061f6c92a9130c9033ea8cf6a53872dcc2e85
+ * private 1c0c5bfa64bc1848de5b0c55dfd483dac488cd8f76e440c41fa7da8d218b61e3
+ * address 1da2e84f408c124a3a205d28218f63042dce54cd
  */
 
 app.get('/balance/:address', (req, res) => {
@@ -35,11 +42,19 @@ app.get('/wallets', (_req, res) => {
 });
 
 app.post('/send', (req, res) => {
-  const { sender, recipient, amount } = req.body;
-
+  // TODO: get a signature from the client-side application
+  // recover the public address from the signature
+  const { message, signature, recoveryBit } = req.body;
+  const recoveredPublicKey = recoverKey(
+    JSON.stringify(message),
+    hexToBytes(signature),
+    recoveryBit
+  );
+  const recoveredAddress = publicKeyToAddress(recoveredPublicKey);
+  const { sender, recipient, amount } = message;
+  if (sender !== recoveredAddress) throw new Error('sender is different');
   setInitialBalance(sender);
   setInitialBalance(recipient);
-
   if (balances[sender] < amount) {
     res.status(400).send({ message: 'Not enough funds!' });
   } else {

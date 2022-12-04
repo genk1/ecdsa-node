@@ -1,17 +1,18 @@
+import * as secp from 'ethereum-cryptography/secp256k1';
+import {toHex} from 'ethereum-cryptography/utils';
 import { useEffect } from "react";
 import { useState } from "react";
+
 import server from "./server";
+import {publicKeyToAddress} from "./scripts/publicKeyToAddress";
 
-function Wallet({ address, setAddress, balance, setBalance }) {
-
+function Wallet({ address, setAddress, balance, setBalance, privateKey, setPrivateKey }) {
   const [addresses, setAddresses] =useState([])
   async function onChange(evt) {
-    const address = evt.target.value;
-    setAddress(address);
+    setPrivateKey(evt.target.value);
+    setAddress(toHex(publicKeyToAddress(secp.getPublicKey(evt.target.value))))
     if (address) {
-      const {
-        data: { balance },
-      } = await server.get(`balance/${address}`);
+      const { data: { balance } } = await server.get(`balance/${address}`);
       setBalance(balance);
     } else {
       setBalance(0);
@@ -22,22 +23,19 @@ function Wallet({ address, setAddress, balance, setBalance }) {
     (async() => {
       const {data: { wallets }} = await server.get(`wallets`);
       setAddresses(wallets)
-      console.log(wallets)
     })()
   })
 
   return (
     <div className="container wallet">
       <h1>Your Wallet</h1>
-
-      <label>
-        Wallet Address
-          <select value={address} onChange={onChange}>
-            {addresses.map(addr => <option value={addr}>{addr.slice(0, 20)}...</option>)}
-          </select>
-        {/* <input placeholder="Type an address, for example: 0x1" value={address} onChange={onChange}></input> */}
-      </label>
-
+      <lave>
+        Private Key
+        <input placeholder="Type Private key" value={privateKey} onChange={async(e) => await onChange(e)}></input>
+      </lave>
+      <p>
+        address: {address}
+      </p>
       <div className="balance">Balance: {balance}</div>
     </div>
   );
